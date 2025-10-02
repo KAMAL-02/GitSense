@@ -14,7 +14,7 @@ export function loadConfig(context: vscode.ExtensionContext): Config {
         aiKey: config.get<string>('aiKey') || '',
         prompt: config.get<string>('prompt') || ''
     };
-    console.log("Settings Config: ", settingsConfig);
+
     if (settingsConfig.aiKey && settingsConfig.prompt) {
         return settingsConfig;
     }

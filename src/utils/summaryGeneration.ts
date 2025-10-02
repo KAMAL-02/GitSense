@@ -10,9 +10,8 @@ let config: Config;
 export function getEnv(context: vscode.ExtensionContext) {
   config = loadConfig(context);
   if (!config.aiKey || !config.prompt) {
-    throw new Error("API key not found in settings or .env file");
+    throw new Error("API key not found");
   }
-  console.log("Config loaded: ", config);
 }
 
 //! function to generate the summary
@@ -21,7 +20,7 @@ export async function generateSummary(tracker: ActivityTracker) {
 
   const genAI = new GoogleGenerativeAI(config.aiKey);
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   try {
     const result = await model.generateContent(
