@@ -76,7 +76,7 @@ export function pushSummary(githubService: GithubService) {
     } finally {
       isProcessing = false;
     }
-  }, 3600000); // Run every 1hr
+  }, 30*60*1000); // Run every 30 minutes
 
   return () => {
     if (summaryInterval) {
