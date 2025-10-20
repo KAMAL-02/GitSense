@@ -81,12 +81,20 @@ export class ActivityTracker {
         }
     }
 
-    //! this method returns all the changes available in the codeHistory array
     public getAllChanges(): codeChange[]{
         return [...this.codeHistory];
     }
 
-    //! this method returns the summary so that it can be analyzed by AI
+    public clearHistory(){
+        this.codeHistory = [];
+        this.hasNewChanges = false;
+    }
+
+    public hasChanges(){
+        return this.hasNewChanges;
+    }
+
+    
     public getFormattedSummary(): string{
         let summary = '';
 
@@ -101,14 +109,9 @@ export class ActivityTracker {
     }
 
     //! this method clears the history of the codeHistory array
-    public clearHistory(){
-        this.codeHistory = [];
-        this.hasNewChanges = false;
-    }
+    
 
-    public hasChanges(){
-        return this.hasNewChanges;
-    }
+    
 
     //! A dispose method to clear the debounce timeout
     public dispose(){

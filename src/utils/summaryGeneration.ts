@@ -1,30 +1,21 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { tracker } from "./activityTracker";
 import { GithubService } from "./githubApi";
-import { loadConfig, Config } from "./loadenv";
 import { ActivityTracker } from "./activityTracker";
-import * as vscode from "vscode";
-
-//! function to load the env file
-let config: Config;
-export function getEnv(context: vscode.ExtensionContext) {
-  config = loadConfig(context);
-  if (!config.aiKey || !config.prompt) {
-    throw new Error("API key not found");
-  }
-}
+import { globalConfig } from "../extension";
+import api from "./api";
 
 //! function to generate the summary
 export async function generateSummary(tracker: ActivityTracker) {
   const codeHistory = tracker.getFormattedSummary();
 
-  const genAI = new GoogleGenerativeAI(config.aiKey);
+  const genAI = new GoogleGenerativeAI(globalConfig.aiKey);
 
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   try {
     const result = await model.generateContent(
-      `${config.prompt}\n${codeHistory}`
+      `${globalConfig.prompt}\n${codeHistory}`
     );
 
     if (!result.response.text()) {
@@ -38,11 +29,20 @@ export async function generateSummary(tracker: ActivityTracker) {
   }
 }
 
+export async function updateUser(lastCommitAt: number) {
+  const response = await api.put("/user/update", {
+    lastCommitAt
+  });
+  if (response && response.data) {
+    console.log("User last commit time updated:", response.data);
+    return response.data;
+  }
+}
+
 // //! Pushing summary after specified interval
 let summaryInterval: NodeJS.Timeout | null = null;
 
 export function pushSummary(githubService: GithubService) {
-
   const username = githubService.Info.username;
   if (!username) {
     console.log("Username not found, cant generate summary");
@@ -69,6 +69,7 @@ export function pushSummary(githubService: GithubService) {
       console.log("Summary generated is: ", summary);
       if (summary) {
         await githubService.saveSummary(summary);
+        await updateUser(Date.now());
         tracker.clearHistory();
       }
     } catch (error) {
@@ -76,7 +77,7 @@ export function pushSummary(githubService: GithubService) {
     } finally {
       isProcessing = false;
     }
-  }, 3600000); // Run every 1hr
+  }, 3600000); // Run every 1hr 60000 3600000
 
   return () => {
     if (summaryInterval) {
@@ -85,52 +86,52 @@ export function pushSummary(githubService: GithubService) {
     }
   };
 
-//   let pushTimer = setTimeout(async () => {
-//     if (tracker.hasChanges()) {
-//         try {
-//             console.log("Generating and pushing summary...");
-//             const summary = await generateSummary(tracker);
+  //   let pushTimer = setTimeout(async () => {
+  //     if (tracker.hasChanges()) {
+  //         try {
+  //             console.log("Generating and pushing summary...");
+  //             const summary = await generateSummary(tracker);
 
-//             if (summary) {
-//                 await githubService.saveSummary(summary);
-//                 tracker.clearHistory();
-//                 tracker.updateLastPushTime(Date.now());
+  //             if (summary) {
+  //                 await githubService.saveSummary(summary);
+  //                 tracker.clearHistory();
+  //                 tracker.updateLastPushTime(Date.now());
 
-//                 pushTimer = setTimeout(pushLoop, HOUR); // Reset timer for next hour
-//             }
-//         } catch (error) {
-//             console.error("Error pushing summary:", error);
-//         }
-//     } else {
-//         console.log("No changes to push, waiting for next interval");
-//         pushTimer = setTimeout(pushLoop, HOUR);
-//     }
-// }, remainingTime);
+  //                 pushTimer = setTimeout(pushLoop, HOUR); // Reset timer for next hour
+  //             }
+  //         } catch (error) {
+  //             console.error("Error pushing summary:", error);
+  //         }
+  //     } else {
+  //         console.log("No changes to push, waiting for next interval");
+  //         pushTimer = setTimeout(pushLoop, HOUR);
+  //     }
+  // }, remainingTime);
 
-//     // Function to handle the continuous push loop
-//     function pushLoop() {
-//       if (tracker.hasChanges()) {
-//           generateSummary(tracker).then(async (summary) => {
-//               if (summary) {
-//                   await githubService.saveSummary(summary);
-//                   tracker.clearHistory();
-//                   tracker.updateLastPushTime(Date.now());
-//               }
-//               pushTimer = setTimeout(pushLoop, HOUR);
-//           }).catch(error => {
-//               console.error("Error in push loop:", error);
-//               pushTimer = setTimeout(pushLoop, HOUR);
-//           });
-//       } else {
-//           // No changes, check again in an hour
-//           pushTimer = setTimeout(pushLoop, HOUR);
-//       }
-//   }
+  //     // Function to handle the continuous push loop
+  //     function pushLoop() {
+  //       if (tracker.hasChanges()) {
+  //           generateSummary(tracker).then(async (summary) => {
+  //               if (summary) {
+  //                   await githubService.saveSummary(summary);
+  //                   tracker.clearHistory();
+  //                   tracker.updateLastPushTime(Date.now());
+  //               }
+  //               pushTimer = setTimeout(pushLoop, HOUR);
+  //           }).catch(error => {
+  //               console.error("Error in push loop:", error);
+  //               pushTimer = setTimeout(pushLoop, HOUR);
+  //           });
+  //       } else {
+  //           // No changes, check again in an hour
+  //           pushTimer = setTimeout(pushLoop, HOUR);
+  //       }
+  //   }
 
-//   // Return cleanup function
-//   return () => {
-//       if (pushTimer) {
-//           clearTimeout(pushTimer);
-//       }
-//   };
+  //   // Return cleanup function
+  //   return () => {
+  //       if (pushTimer) {
+  //           clearTimeout(pushTimer);
+  //       }
+  //   };
 }

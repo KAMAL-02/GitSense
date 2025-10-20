@@ -4,7 +4,7 @@
   "publisher": "KAMAL-02",
   "icon": "images/icon.png",
   "description": "Automates the process of summarizing your coding activity and committing it to a GitHub repository",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -15,15 +15,10 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
-  "authentication": ["github"],
-  "contributes": {
-    "commands": [
-      {
-        "command": "gitsense.updateToken",
-        "title": "Update Token for GitSense"
-      }
-    ]
-  },
+  "authentication": [
+    "github"
+  ],
+  "contributes": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/KAMAL-02/GitSense.git"
@@ -56,6 +51,11 @@
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
     "@octokit/rest": "^21.0.2",
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
+    "ky": "^1.12.0",
+    "ky-universal": "^0.12.0",
+    "node-fetch": "^3.3.2",
     "octokit": "^4.0.2"
   }
 }

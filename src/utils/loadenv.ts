@@ -5,6 +5,7 @@ import * as fs from 'fs';
 export interface Config {
     aiKey: string;
     prompt: string;
+    apiUrl?: string;
 }
 
 export function loadConfig(context: vscode.ExtensionContext): Config {
@@ -12,10 +13,11 @@ export function loadConfig(context: vscode.ExtensionContext): Config {
     const config = vscode.workspace.getConfiguration('gitsense');
     const settingsConfig = {
         aiKey: config.get<string>('aiKey') || '',
-        prompt: config.get<string>('prompt') || ''
+        prompt: config.get<string>('prompt') || '',
+        apiUrl: config.get<string>('apiUrl') || '',
     };
 
-    if (settingsConfig.aiKey && settingsConfig.prompt) {
+    if (settingsConfig.aiKey && settingsConfig.prompt && settingsConfig.apiUrl) {
         return settingsConfig;
     }
 
@@ -23,9 +25,12 @@ export function loadConfig(context: vscode.ExtensionContext): Config {
     const envPath = path.join(context.extensionPath, '.env');
     if (fs.existsSync(envPath)) {
         const envContent = fs.readFileSync(envPath, 'utf8');
-        const aiKey = envContent.match(/AI_KEY=(.+)/)?.[1] || '';
-        const prompt = envContent.match(/PROMPT=(.*)/s)?.[1] || '';
-        return { aiKey, prompt };
+        
+        const aiKey = envContent.match(/^AI_KEY=(.+)/m)?.[1]?.trim() || '';
+        const prompt = envContent.match(/^PROMPT=(.*?)(?=\n|$)/ms)?.[1]?.trim() || '';
+        const apiUrl = envContent.match(/^API_URL=(.+)/m)?.[1]?.trim() || '';
+
+        return { aiKey, prompt, apiUrl };
     }
 
     return settingsConfig;

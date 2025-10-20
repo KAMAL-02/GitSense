@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import api from "./api";
 const { Octokit } = require("@octokit/rest");
 export class GithubService {
 
@@ -18,35 +19,49 @@ export class GithubService {
     };
   }
 
-  //! Method to check if user is logged in vscode via github and if not then ask for PAT
-  //! This method removes the need of getToken method()
+ /**
+  * * Store user data in the backend
+  * @param userData - The user data to store
+  * @returns The response from the backend
+  */
+  public async storeUser(userData: any) {
+    try {
+      console.log("Registering user...");
+      
+      const response = await api.post('/user/register', {
+        githubId: userData.id,
+        username: userData.login,
+        email: userData.email,
+        name: userData.name,
+        avatarUrl: userData.avatar_url,
+      });
+
+      console.log("User registered:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Error registering user:", error);
+      if ((error as any).config) {
+        console.error("Request config:", (error as any).config);
+      }
+    }
+  }
+
+  //! Method to check if user is logged in vscode via github
   public async checkSession(){
-    let token = await this.context.secrets.get("githubPAT");
-    if(!token){
       const credentials = await vscode.authentication.getSession(
         "github",
         ["repo"],
         { createIfNone: true }
       );
-      // console.log("Credentials are:", credentials?.accessToken);
+    
       if (!credentials) {
         vscode.window.showErrorMessage(
-          "GitHub credentials not found. Please log in to VS Code using your GitHub credentials or run the 'Update Token' command to enter a Personal Access Token (PAT)."
+        "GitSense: GitHub credentials not found. Please sign in to VS Code with your GitHub account."
         );
         return;
       }
-      token = credentials?.accessToken;
-      // await this.context.secrets.store("githubPAT", token);
-      try {
-        await this.context.secrets.store("githubPAT", token); // Store token
-        console.log("Token stored successfully.");
-    } catch (error) {
-        console.error("Error storing the token:", error);
-        vscode.window.showErrorMessage(
-            "Failed to save GitHub token. Please try again later."
-        );
-    }
-    }
+    
+    const token = credentials.accessToken;
     this.Info.token = token;
     this.Info.octokit = new Octokit({ auth: token });
 
@@ -55,24 +70,26 @@ export class GithubService {
       this.Info.username = data.login;
       if (!this.Info.username) {
          return vscode.window.showErrorMessage(
-          "Error setting Github, Kindly login again or run `Update Token` to enter personal access token (PAT)"
+          "GitSense: Error setting GitHub account. Please try signing in again."
         );
       }
       console.log("Username is:", this.Info.username);
-      vscode.window.showInformationMessage(`Github account ${this.Info.username} is set for GitSense Extension`);
+      vscode.window.showInformationMessage(`GitSense: GitHub account ${this.Info.username} is set for GitSense Extension`);
+      await this.storeUser(data);
+      
       this.createRepo();
     } catch (error) {
       console.log("Error setting username", error);
-      await this.context.secrets.delete("githubPAT");
       return vscode.window.showErrorMessage(
-        "Error setting Github, Kindly login again or run `Update Token` to enter personal access token (PAT)"
+        "GitSense: Error setting GitHub account. Please try signing in again."
       );
     }
 
   }
 
-  //! Getting token and storing key information of User
-  //! This getToken method will run only 1 time when the extension is activated and for updation we use updateToken method
+  /**
+   * * Getting token and storing key information of User
+   */
   // public async getToken() {
 
   //   let token = await this.context.secrets.get("githubPAT");
@@ -115,59 +132,64 @@ export class GithubService {
   //   }
   // }
 
-  //! Method to update the token
-  public async updateToken(){
-    let token = await this.context.secrets.get("githubPAT");
-    console.log("token is:", token );
-    await this.context.secrets.delete("githubPAT");
-    token = await this.context.secrets.get("githubPAT");
-    console.log("Token after deletion is ", token );
+  /**
+   * * update PAT
+   * 
+   */
+  // public async updateToken(){
+  //   let token = await this.context.secrets.get("githubPAT");
+  //   console.log("token is:", token );
+  //   await this.context.secrets.delete("githubPAT");
+  //   token = await this.context.secrets.get("githubPAT");
+  //   console.log("Token after deletion is ", token );
 
-    this.Info.token = undefined;
-    this.Info.username = undefined;
-    this.Info.octokit = undefined;
+  //   this.Info.token = undefined;
+  //   this.Info.username = undefined;
+  //   this.Info.octokit = undefined;
 
-     token = await vscode.window.showInputBox({
-      prompt:
-        "Enter your github personal access token (PAT) with access to repo",
-      placeHolder: "ghp_xxx...",
-      ignoreFocusOut: true,
-      password: true,
-    });
-    if (!token) {
-      return vscode.window.showWarningMessage("PAT is required, run `Update Token` again to enter PAT");
-    }
-    await this.context.secrets.store("githubPAT", token);
+  //    token = await vscode.window.showInputBox({
+  //     prompt:
+  //       "Enter your github personal access token (PAT) with access to repo",
+  //     placeHolder: "ghp_xxx...",
+  //     ignoreFocusOut: true,
+  //     password: true,
+  //   });
+  //   if (!token) {
+  //     return vscode.window.showWarningMessage("PAT is required, run `Update Token` again to enter PAT");
+  //   }
+  //   await this.context.secrets.store("githubPAT", token);
 
-    this.Info.token = token;
-    this.Info.octokit = new Octokit({ auth: token });
+  //   this.Info.token = token;
+  //   this.Info.octokit = new Octokit({ auth: token });
 
-    try {
-      const { data } = await this.Info.octokit.users.getAuthenticated();
-      this.Info.username = data.login;
-      if (!this.Info.username) {
-        return vscode.window.showErrorMessage(
-          "Error setting Github, Kindly check you PAT and run `Update Token` again to enter PAT"
-        );
-      }
-      console.log("Username is:", this.Info.username);
-      vscode.window.showInformationMessage(`Github account ${this.Info.username} is set for GitSense Extension`);
-      this.createRepo();
-    } catch (error) {
-      console.log("Error setting username", error);
-      await this.context.secrets.delete("githubPAT");
-      return vscode.window.showErrorMessage(
-        "Error setting Github, Kindly check you PAT and run `Update Token` again to enter PAT"
-      );
-    }
-  }
+  //   try {
+  //     const { data } = await this.Info.octokit.users.getAuthenticated();
+  //     this.Info.username = data.login;
+  //     if (!this.Info.username) {
+  //       return vscode.window.showErrorMessage(
+  //         "Error setting Github, Kindly check you PAT and run `Update Token` again to enter PAT"
+  //       );
+  //     }
+  //     console.log("Username is:", this.Info.username);
+  //     vscode.window.showInformationMessage(`Github account ${this.Info.username} is set for GitSense Extension`);
+  //     this.createRepo();
+  //   } catch (error) {
+  //     console.log("Error setting username", error);
+  //     await this.context.secrets.delete("githubPAT");
+  //     return vscode.window.showErrorMessage(
+  //       "Error setting Github, Kindly check you PAT and run `Update Token` again to enter PAT"
+  //     );
+  //   }
+  // }
 
   //! Creating repository for summaries
+  
+  
   public async createRepo() {
 
     if (!this.Info.octokit || !this.Info.username) {
       return vscode.window.showErrorMessage(
-        "Error setting Github, Kindly check you PAT"
+        "GitSense: GitHub service not initialized. Please sign in to VS Code with your GitHub account."
       );
     }
     let repoExists = false;
@@ -205,7 +227,7 @@ export class GithubService {
   //! Initializing repository with Readme.md file
   public async initializeRepo() {
     if(!this.Info.octokit || !this.Info.username){
-      return vscode.window.showErrorMessage("Error setting Github, Kindly check you PAT");
+      return vscode.window.showErrorMessage("GitSense: GitHub service not initialized. Please sign in to VS Code with your GitHub account.");
     }
 
     try {
@@ -234,7 +256,7 @@ export class GithubService {
   public async saveSummary(summary: string) {
     if (!this.Info.octokit || !this.Info.username) {
       console.log("No octokit or username found");
-      return vscode.window.showErrorMessage("GitHub service not initialized, Kindly check PAT and run `Update Token` to enter PAT");
+      return vscode.window.showErrorMessage("GitSense: GitHub service not initialized. Please sign in to VS Code with your GitHub account.");
     }
     try {
       const date = new Date();
@@ -289,138 +311,3 @@ export function initializeGithubService(context: vscode.ExtensionContext) {
   const githubService = new GithubService(context);
   return githubService;
 }
-
-// export const githubService = initializeGithubService();
-
-// export class GitHubService {
-//     private octokit: Octokit;
-//     private readonly repoName = 'gitime';
-//     private timer: NodeJS.Timer | null = null;
-
-//     constructor() {
-//         // Initialize without token first
-//         this.octokit = new Octokit();
-//     }
-
-//     // Setup method to be called when extension activates
-//     async setup() {
-//         const token = await this.getOrRequestToken();
-//         this.octokit = new Octokit({ auth: token });
-//         await this.ensureRepositoryExists();
-//         this.startAutoCommits();
-//     }
-
-//     private async getOrRequestToken(): Promise<string> {
-//         // First check if token exists in settings
-//         const config = vscode.workspace.getConfiguration('gitime');
-//         let token = config.get<string>('githubToken');
-
-//         if (!token) {
-//             // If no token, prompt user
-//             token = await vscode.window.showInputBox({
-//                 prompt: 'Please enter your GitHub Personal Access Token (needs repo access)',
-//                 password: true, // Hides the input
-//                 ignoreFocusOut: true, // Keeps prompt open when focus is lost
-//                 placeHolder: 'ghp_xxx...',
-//                 validateInput: (input) => {
-//                     return input.startsWith('ghp_') ? null : 'Token should start with ghp_';
-//                 }
-//             });
-
-//             if (!token) {
-//                 throw new Error('GitHub token is required for this extension to work');
-//             }
-
-//             // Save token in VSCode settings
-//             await config.update('githubToken', token, true);
-//         }
-
-//         return token;
-//     }
-
-//     private async ensureRepositoryExists() {
-//         try {
-//             const { data: user } = await this.octokit.users.getAuthenticated();
-
-//             try {
-//                 // Check if repo exists
-//                 await this.octokit.repos.get({
-//                     owner: user.login,
-//                     repo: this.repoName
-//                 });
-//                 console.log('Repository already exists');
-//             } catch {
-//                 // Create new repository if it doesn't exist
-//                 await this.octokit.repos.createForAuthenticatedUser({
-//                     name: this.repoName,
-//                     private: true,
-//                     description: 'Automated code activity tracking and summaries',
-//                     auto_init: true // Creates with a README
-//                 });
-//                 console.log('Created new repository: gitime');
-//                 vscode.window.showInformationMessage('Created new gitime repository in your GitHub account');
-//             }
-//         } catch (error) {
-//             vscode.window.showErrorMessage(`Failed to setup GitHub repository: ${error.message}`);
-//             throw error;
-//         }
-//     }
-
-//     async commitSummary(summary: string) {
-//         try {
-//             const { data: user } = await this.octokit.users.getAuthenticated();
-//             const date = new Date().toISOString();
-//             const fileName = `summaries/${date.split('T')[0]}/${date.split('T')[1].split('.')[0].replace(/:/g, '-')}.md`;
-
-//             // Get the default branch
-//             const { data: repo } = await this.octokit.repos.get({
-//                 owner: user.login,
-//                 repo: this.repoName
-//             });
-
-//             try {
-//                 // Create or update the file
-//                 await this.octokit.repos.createOrUpdateFileContents({
-//                     owner: user.login,
-//                     repo: this.repoName,
-//                     path: fileName,
-//                     message: `Update coding activity summary for ${date}`,
-//                     content: Buffer.from(summary).toString('base64'),
-//                     branch: repo.default_branch
-//                 });
-
-//                 console.log('Successfully committed summary');
-//             } catch (error) {
-//                 console.error('Error committing summary:', error);
-//                 throw error;
-//             }
-//         } catch (error) {
-//             vscode.window.showErrorMessage(`Failed toGitime summary: ${error.message}`);
-//             throw error;
-//         }
-//     }
-
-//     private startAutoCommits() {
-//         // Clear any existing timer
-//         if (this.timer) {
-//             clearInterval(this.timer);
-//         }
-
-//         // Set up hourly commits
-//         this.timer = setInterval(async () => {
-//             try {
-//                 // This will be called from your main extension file
-//                 vscode.commands.executeCommand('gitime.createHourlySummary');
-//             } catch (error) {
-//                 console.error('Error in auto-commit:', error);
-//             }
-//         }, 60 * 60 * 1000); // Run every hour
-//     }
-
-//     // Cleanup method to be called when extension deactivates
-//     dispose() {
-//         if (this.timer) {
-//             clearInterval(this.timer);
-//         }
-//     }
-// }
