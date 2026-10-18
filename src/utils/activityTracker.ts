@@ -1,126 +1,66 @@
-// import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import { isTrackablePath, TrackedChange } from "./changes";
 
-// export function trackActivity(){
+// Upper bound on files remembered between summaries, to keep memory in check
+const MAX_TRACKED_FILES = 500;
 
-//     let codeSaved = '';
-//     let previousFilePath = '';
+export class ActivityTracker implements vscode.Disposable {
+  // Latest snapshot per file (workspace-relative path) since the last successful summary
+  private readonly changes = new Map<string, TrackedChange>();
+  private readonly changeEmitter = new vscode.EventEmitter<void>();
+  private readonly saveListener: vscode.Disposable;
 
-//     vscode.workspace.onDidSaveTextDocument((event) => {
-//         const editor = vscode.window.activeTextEditor;
-//         // console.log("editor is", editor);
-//         if (!editor) {
-//             return;
-//         }
-//         const text = editor.document.getText();
-//         const filePath = editor.document.fileName;
+  readonly onDidChange = this.changeEmitter.event;
 
-//         if(filePath === previousFilePath){
-//             codeSaved = "file path is: " + filePath + "\n" +  "the code is:" + text;
-//         }else{
-//             codeSaved += "\n\n" + "file path is: " + filePath + "\n" +  "the code is:" + text;
-//         }
-//         previousFilePath = filePath;
-//         console.log('Code saved:', codeSaved);
-//     });
-// }
+  constructor() {
+    this.saveListener = vscode.workspace.onDidSaveTextDocument((doc) => this.track(doc));
+  }
 
-import * as vscode from 'vscode';
+  get pendingCount(): number {
+    return this.changes.size;
+  }
 
-interface codeChange {
-    filepath: string;
-    content: string;
-    timestamp: number;
+  hasChanges(): boolean {
+    return this.changes.size > 0;
+  }
+
+  snapshot(): TrackedChange[] {
+    return [...this.changes.values()];
+  }
+
+  // Forget only what was actually summarized. Files saved again while the request was in
+  // flight have a newer timestamp and stay pending for the next run.
+  acknowledge(sent: TrackedChange[]): void {
+    for (const change of sent) {
+      if (this.changes.get(change.filepath)?.timestamp === change.timestamp) {
+        this.changes.delete(change.filepath);
+      }
+    }
+    this.changeEmitter.fire();
+  }
+
+  private track(doc: vscode.TextDocument): void {
+    // Only real files inside an open workspace folder. This skips untitled buffers, git/diff
+    // views, and files like the user's settings.json that live outside the project.
+    if (doc.uri.scheme !== "file" || !vscode.workspace.getWorkspaceFolder(doc.uri)) {
+      return;
+    }
+    const filepath = vscode.workspace.asRelativePath(doc.uri, true);
+    if (!isTrackablePath(filepath)) {
+      return;
+    }
+
+    // Re-insert so Map order stays oldest-first for eviction
+    this.changes.delete(filepath);
+    this.changes.set(filepath, { filepath, content: doc.getText(), timestamp: Date.now() });
+    if (this.changes.size > MAX_TRACKED_FILES) {
+      this.changes.delete(this.changes.keys().next().value!);
+    }
+    this.changeEmitter.fire();
+  }
+
+  dispose(): void {
+    this.saveListener.dispose();
+    this.changeEmitter.dispose();
+  }
 }
-export class ActivityTracker {
-    private codeHistory: codeChange[] =[];
-    private maxHistorySize: number = 100;
-    private hasNewChanges: boolean = false;
-    private debounceTimeout : NodeJS.Timeout | null = null;
-    private readonly DEBOUNCE_DELAY = 5000;
-
-    constructor(){
-        this.setupEventListeners();
-    }
-
-    //! this method sets up the event listeners that will track the changes and runs after debounce delay
-    private setupEventListeners(){
-        vscode.workspace.onDidSaveTextDocument((e)=>{
-            const editor = vscode.window.activeTextEditor;
-            if(!editor){
-                return;
-            }
-            if(this.debounceTimeout){
-                clearTimeout(this.debounceTimeout);
-            }
-            this.debounceTimeout = setTimeout(()=>{
-                this.trackChange(editor);
-            }, this.DEBOUNCE_DELAY);
-        });
-    }
-
-    // this method tracks the change done by the user in their file and stores it in the codeHistory array
-    private trackChange(editor: vscode.TextEditor){
-
-        const text = editor.document.getText();
-        const words = text.split(/\s+/);
-        const limitedText = words.slice(0, 1000).join(" ");  // Limiting words to increase efficiency
-        const filepath = editor.document.fileName;
-
-        const change: codeChange = {
-            filepath,
-            content: limitedText,
-            timestamp: Date.now()
-        };
-        
-        this.codeHistory.push(change);
-        this.hasNewChanges = true;
-        console.log("code history is", this.codeHistory);
-
-        if(this.codeHistory.length > this.maxHistorySize){
-            this.codeHistory.shift();
-        }
-    }
-
-    //! this method returns all the changes available in the codeHistory array
-    public getAllChanges(): codeChange[]{
-        return [...this.codeHistory];
-    }
-
-    //! this method returns the summary so that it can be analyzed by AI
-    public getFormattedSummary(): string{
-        let summary = '';
-
-        for(const change of this.codeHistory){
-            summary += `\nFile Path: ${change.filepath}\n`;
-            summary += `Timestamp: ${new Date(change.timestamp).toLocaleString()}\n`;
-            summary += `Code:\n${change.content}\n`;
-            summary += '----------------------------------------\n';
-        }
-
-        return summary;
-    }
-
-    //! this method clears the history of the codeHistory array
-    public clearHistory(){
-        this.codeHistory = [];
-        this.hasNewChanges = false;
-    }
-
-    public hasChanges(){
-        return this.hasNewChanges;
-    }
-
-    //! A dispose method to clear the debounce timeout
-    public dispose(){
-        if (this.debounceTimeout) {
-            clearTimeout(this.debounceTimeout);
-        }
-    }
-}
-
-export function initializeActivityTracker(): ActivityTracker {
-    const tracker = new ActivityTracker();
-    return tracker;
-}
-
-export const tracker = initializeActivityTracker();

@@ -17,12 +17,8 @@ GitSense addresses this gap by ensuring your personal GitHub profile stays activ
 1. **Automated Monitoring**: GitSense monitors the codes you save and generates summaries of your code every hour.
 2. **Hourly Commits**: After continous hour of work, GitSense commits and pushes a summary of your changes to the `GitSense-commits` repository.
    - For example, if you work for 2 hours continously, there will be 2 commits and pushes.
-3. **GitHub Integration**:
-   - Login via VS Code to authenticate with your GitHub account.
-   - Alternatively, you can manually enter your GitHub Personal Access Token (PAT) for authentication.
+3. **GitHub Integration**: Seamlessly integrates with VS Code's GitHub authentication to access your account.
 4. **Enhance Your GitHub Profile**: Maintain a consistent and active commit chart on your personal GitHub profile, even when working on professional projects.
-5. **Commands**:
-   - Update your PAT manually with the `Update Token` command.
 
 ---
 
@@ -34,37 +30,39 @@ Install GitSense from the VS Code marketplace. [Link to the extension](https://m
 
 ## Getting Started
 
-### Step 1: Authenticate with GitHub
-GitSense requires access to your GitHub account to push commits. You can authenticate in one of the following ways:
+### Authenticate with GitHub
+GitSense requires access to your GitHub account to push commits. 
 
-#### **Option 1: Login via VS Code**
-1. If you are already logged in VS Code through Github, GitSense will start working immediately.
-2. If not, you will be prompted to login via GitHub.
-
-#### **Option 2: Use a Personal Access Token (PAT)**
-1. Generate a Personal Access Token by following [this guide](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens).
-   - Ensure the token has `repo` access.
-<img src="https://raw.githubusercontent.com/KAMAL-02/GitSense/refs/heads/main/images/setPAT4.png" alt="Set PAT Example" width="500" />
-2. Open the command palette (`Ctrl + Shift + P` or `Cmd + Shift + P`).
-3. Run `Update Token for GitSense` and enter your PAT in the input box.
-<img src="https://raw.githubusercontent.com/KAMAL-02/GitSense/refs/heads/main/images/updateToken.png" alt="Update Token" width="500" />
+1. If you are already logged into VS Code through GitHub, GitSense will start working immediately.
+2. If not, you will be prompted to login via GitHub when you first use the extension.
+3. Once authenticated, GitSense will automatically monitor your coding activity and commit summaries to your `GitSense-commits` repository.
 
 ---
 
-## Command
+## Commands
 
-### 1. **Update Token for GitSense**
-- Update your Personal Access Token (PAT) for GitHub authentication.
-- Command: `Update Token for GitSense`
-- Shortcut: `Ctrl + Shift + P` or `Cmd + Shift + P`, then type `Update Token`.
-<img src="https://raw.githubusercontent.com/KAMAL-02/GitSense/refs/heads/main/images/updateToken.png" alt="Update Token" width="500" />
+Open the Command Palette (`Ctrl+Shift+P`) and type **GitSense**:
+
+- **Summarize and Push Now**: push a summary immediately instead of waiting for the hourly run
+- **Sign in with GitHub**: connect or reconnect your GitHub account
+- **Show Log**: open the GitSense output log for troubleshooting
+
+The **GitSense** item in the status bar shows how many files are waiting for the next summary. Click it to push now.
+
+---
+
+## Privacy
+
+- When you save a file in your workspace, GitSense keeps its latest contents in memory until the next hourly summary.
+- To generate the summary, those contents are sent to the GitSense server, which passes them to Google Gemini. Code is **not stored** on the server; only your GitHub username, profile info and usage counts are.
+- Files that commonly contain secrets are **never sent**: `.env` files, private keys and certificates, `.npmrc`/`.netrc`, and any file with "secret" or "credential" in its name. Files in `node_modules`, `.git`, `dist`, `build` and similar folders, and files outside your open workspace, are skipped too.
+- GitSense uses `repo` access to write to your `GitSense-Commits` repository. The repository is created as public, but you can make it private on GitHub and GitSense keeps working.
 
 ---
 
 ## Requirements
 - **VS Code**: Make sure you have VS Code installed.
-- **GitHub Account**: Required for authentication.
-- **Personal Access Token (Optional)**: If not using the login feature.
+- **GitHub Account**: Required for authentication via VS Code.
 
 ---
 

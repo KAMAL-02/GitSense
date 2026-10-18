@@ -12,3 +12,9 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+.env
+.env.*
+test.js
+*.vsix
+images/setPAT*.png
+images/updateToken*.png
